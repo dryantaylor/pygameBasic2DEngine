@@ -1,0 +1,23 @@
+does loop (0 - False, 1 - True)
+img mode (0 - file location, 1 - each line is the img encoded as string)
+number of images in animation
+next num images lines are the images
+mode 1 only - width height of that image
+next num images lines are the timings
+
+example:
+1 //does loop
+0 // img mode
+4 //num images
+./assetscharacter/idle/00.png // |-file locations
+./assetscharacter/idle/01.png // |
+./assetscharacter/idle/02.png // |
+./assetscharacter/idle/03.png // |-
+(500,370)
+(500,370)
+(500,370)
+(500,370)
+0.125 // |- timings
+0.125 // |
+0.125 // |
+0.125 // |-

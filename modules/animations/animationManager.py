@@ -20,6 +20,23 @@ class AnimationManager:
     def add_animation(self, name: str, images: Tuple[pygame.Surface], timings: Tuple[float,...], does_loop: bool = True) -> None:
         self.animations[name] = Animation(name, images, timings, does_loop)
 
+    def add_animation_from_file(self,name: str, fileLoc: str):
+        with open(fileLoc,"r") as file:
+            data = file.read().split("\n")
+            does_loop = bool(data[0])
+            mode = int(data[1])
+            num_images = int(data[2])
+            images = data[3:3+num_images]
+            if mode == 0:
+                images = [pygame.image.load(image) for image in images]
+                timings = [float(timing) for timing in data[3 + num_images: 3 + 2 * num_images]]
+
+            elif mode == 1:
+                sizes = data[3+num_images : 3 + 2 * num_images]
+                images = images #work stuff out here
+                timings = data[3 + 2* num_images : 3 + 3 * num_images]
+            self.add_animation(name,images,timings,does_loop)
+
     def set_idle_animation(self, name: str) -> bool:
         self.idle_animation = self.animations.get(name)
         if self.idle_animation is None:
