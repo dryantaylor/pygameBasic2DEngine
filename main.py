@@ -2,10 +2,6 @@ from modules.animation import animationManager as animationManager
 import pygame
 
 from createAnimFile import create_file
-from time import time
-
-
-
 
 def example_animation_from_file():
     display = pygame.display.set_mode((1280, 720), pygame.DOUBLEBUF)
