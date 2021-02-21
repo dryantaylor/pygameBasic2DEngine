@@ -57,6 +57,10 @@ class TransformationManager:
 
 
 class CustomTransitions:
+    """TODO: maybe see if way which uses less performance, presumably creating a new copy of the surface is causing
+             impact """
     @staticmethod
     def tint_image(image: pygame.Surface,colour: tuple[int, int, int]) -> pygame.Surface:
-        return image.fill(colour,pygame.BLEND_ADD)
+        image_copy = image.copy().convert_alpha()
+        image_copy.fill(colour, special_flags=pygame.BLEND_ADD)
+        return image_copy
