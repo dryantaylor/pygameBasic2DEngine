@@ -3,6 +3,7 @@ from typing import *
 from zipfile import ZipFile
 from os import listdir, unlink
 
+
 class Animation:
     def __init__(self, name: str, images: Tuple[pygame.Surface, ...], timings: Tuple[float, ...], does_loop: bool) -> None:
         self.name = name
