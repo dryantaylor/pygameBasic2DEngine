@@ -3,7 +3,6 @@ from typing import *
 
 
 class Transformation:  # frame here like with an animation refers to the effects being applied at one point in time
-    # TODO: Allow multiple effects to happen on a single transition frame
     def __init__(self, name: str, timings: Tuple[float, ...], transformations):
         self.name = name
         self.transformations = transformations
@@ -17,7 +16,7 @@ class TransformationManager:
         self.transformations = {}
         self.time = 0.0
 
-    def add_transformation(self, name: str, timings: tuple[float, ...], *transformations: tuple[tuple[Callable, tuple, int], ...]) -> bool:
+    def add_transformation(self, name: str, timings: tuple[float, ...], *transformations: tuple[tuple[tuple[Callable, tuple, int], ...], ...]) -> bool:
         """
         :param name: name of the transformation to reference in set_active_transformation
         :param timings: amount of time in ms each transform in the series of transforms is applied for
@@ -29,7 +28,6 @@ class TransformationManager:
             return True
         return False
 
-    # TODO: code in apply_transformation_to_frame to allow multiple effects to happen on a single transition frame
     def apply_transformation_to_frame(self, delta_time: int, image: pygame.Surface) -> pygame.Surface:
         if self.active_transformation is not None:
             self.time += delta_time
@@ -45,9 +43,12 @@ class TransformationManager:
                         self.active_transformation = None
                         break
                 else:
-                    func, args, img_pos = self.active_transformation.transformations[self.frame_number]
-                    args[img_pos] = image
-                    return func(*args)
+                    funcs = self.active_transformation.transformations[self.frame_number]
+                    result = image.copy()
+                    for func, args, img_pos in funcs:
+                        args[img_pos] = result
+                        result = func(*args)
+                    return result
         return image
 
     def set_active_transformation(self,name: str):

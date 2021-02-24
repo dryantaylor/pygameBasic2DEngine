@@ -6,7 +6,6 @@ from createAnimFile import create_file
 
 def example_animation_from_file():
     display = pygame.display.set_mode((1280, 720), pygame.DOUBLEBUF)
-
     # creating the animation file
     #FILE = "assets/character/idle/"
     #create_file("test.anim",(1/6, 1/6, 1/6, 1/6), (FILE+"00.png", FILE+"01.png", FILE+"02.png", FILE+"03.png"))
@@ -28,7 +27,7 @@ def example_animation_from_file():
             if event.type == pygame.QUIT:
                 running = False
 
-        display.fill((128,128,128))
+        display.fill((128, 128, 128))
         display.blit(anim_manager.get_frame(delta_time), (100, 100))
         pygame.display.flip()
         print(1/delta_time)
@@ -37,14 +36,19 @@ def example_animation_from_file():
 def example_transform():
     display = pygame.display.set_mode((1280, 720), pygame.DOUBLEBUF)
     transformation_manager = transformationManager.TransformationManager()
-    transformation_manager.add_tranformation("rotate",(1.0,1.0,1.0,1.0,1.0),(pygame.transform.rotate, [None, 0], 0),
-                                             (pygame.transform.rotate, [None, 90], 0),
-                                             (pygame.transform.rotate, [None, 180], 0),
-                                             (pygame.transform.rotate, [None, 270], 0))
+    transformation_manager.add_transformation("rotate",(1.0,1.0,1.0,1.0,1.0),((pygame.transform.rotate, [None, 0], 0),(transformationManager.CustomTransitions.tint_image,[None,(128,0,0,50)],0)),
+                                              ((pygame.transform.rotate, [None, 90], 0), (transformationManager.CustomTransitions.tint_image,[None,(128,0,0,50)],0)),
+                                              ((pygame.transform.rotate, [None, 180], 0), (transformationManager.CustomTransitions.tint_image,[None,(128,0,0,50)],0)),
+                                              ((pygame.transform.rotate, [None, 270], 0), (transformationManager.CustomTransitions.tint_image,[None,(128,0,0,50)],0)))
     transformation_manager.set_active_transformation("rotate")
+    animation_manager = animationManager.AnimationManager()
+    animation_manager.add_animation_from_file("idle","./test.anim", display, 10.0)
+    animation_manager.set_idle_animation("idle")
+    animation_manager.set_active_animation("idle")
+
     clock = pygame.time.Clock()
     running = True
-    image = pygame.transform.scale(pygame.image.load("./assets/character/idle/00.png"),(500,370)).convert_alpha()
+    image = pygame.transform.scale(pygame.image.load("./assets/character/idle/00.png"), (500, 370)).convert_alpha()
     while running:
         delta_time = clock.tick()
         if delta_time > 0:
@@ -58,9 +62,9 @@ def example_transform():
 
         display.fill((128, 128, 128))
         if transformation_manager.active_transformation is not None:
-            display.blit(transformation_manager.apply_transformation_to_frame(delta_time, image), (100, 100))
+            display.blit(transformation_manager.apply_transformation_to_frame(delta_time, animation_manager.get_frame(delta_time)), (100, 100))
         else:
-            display.blit(image, (100, 100))
+            display.blit(animation_manager.get_frame(delta_time), (100, 100))
 
         pygame.display.flip()
         print(1 / delta_time)
