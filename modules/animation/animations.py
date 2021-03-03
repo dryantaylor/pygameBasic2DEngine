@@ -20,8 +20,16 @@ class AnimationManager:
         self.time = 0.0
         self.idle_animation = None
 
-    def add_animation(self, name: str, images: Tuple[pygame.Surface], timings: Tuple[float, ...], does_loop: bool = True) -> None:
-        self.animations[name] = Animation(name, images, timings, does_loop)
+    def get_Animation_object_by_name(self,name: str) -> str:
+        if name in self.animations.keys():
+            return self.animations[name]
+        return None
+
+    def add_animation(self, name: str, images: Tuple[pygame.Surface], timings: Tuple[float, ...], does_loop: bool = True) -> bool:
+        if name not in self.animations.keys():
+            self.animations[name] = Animation(name, images, timings, does_loop)
+            return True
+        return False
 
     def add_animation_from_file(self, animation_name: str, file: str, display: pygame.Surface,  res_scale: float = 1.0) -> bool:
         try:
@@ -47,28 +55,40 @@ class AnimationManager:
             img_objects = [pygame.image.load(f"./temp/{loc}").convert_alpha(display) for loc in data_dict['image_locs']]  #images are stored in /temp
 
             img_objects = tuple([pygame.transform.scale(img_obj,res) for img_obj in img_objects])  # scale images, convert to tuple
-            self.add_animation(animation_name, img_objects, data_dict['timings'], data_dict['does_loop'])
+            return_value = self.add_animation(animation_name, img_objects, data_dict['timings'], data_dict['does_loop'])
 
             for file in listdir("./temp"):  # cleanup, files extracted should be deleted
                 unlink("./temp/"+file)
+
+            return return_value
         except Exception as e:
             for file in listdir("./temp"):  # this needs to be done even when exiting due to an error
-                unlink("./temp/"+file)      # to prevent a leak
-            raise e
+                unlink("./temp/"+file)      # to prevent a leak of the files from the animation not being
+            raise e                         # not being deleted (unlink is the func to delete files)
+
+    def add_animation_from_Animation_object(self, name:str, Animation_object: Animation):
+        Animation_object.name = name
+        if name not in self.animations.keys():
+            self.animations[name] = Animation_object
+            return True
+        return False
 
     def set_idle_animation(self, name: str) -> bool:
         temp_animation = self.animations.get(name)
         if temp_animation is None:
             return False  # return true if animation name doesn't exist
         self.idle_animation = temp_animation
+        if self.active_animation == None:
+            self.active_animation = self.idle_animation
         return True
 
-    def set_active_animation(self, anim_name: str) -> bool:
+    def set_active_animation(self, anim_name: str,reset_to_start:bool = True) -> bool:
         anim = self.animations.get(anim_name)
         if anim is not None:
             self.active_animation = anim
-            self.time = 0.0
-            self.frame_number = 0
+            if reset_to_start:
+                self.time = 0.0
+                self.frame_number = 0
             return True
         return False  # returns false if animation can't be found
     
@@ -91,3 +111,6 @@ class AnimationManager:
                         self.active_animation = self.idle_animation
             else:
                 return self.active_animation.images[self.frame_number]
+
+    def update_time(self, delta_time: float) -> None:
+        self.time += delta_time
