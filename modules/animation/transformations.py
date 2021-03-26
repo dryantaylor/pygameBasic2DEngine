@@ -1,9 +1,17 @@
 import pygame
 from typing import *
-from copy import copy
+from copy import deepcopy
 from math import floor
+from decimal import Decimal
 
 from modules.animation.animations import Animation, AnimationManager
+
+
+class CONVERT_MODE:
+    END_AT_SHORTEST = 0
+    class END_AFTER_LONGEST:
+        LOOP_SHORTEST = 1
+        DONT_LOOP_SHORTEST = 2
 
 class Transformation:  # frame here like with an animation refers to the effects being applied at one point in time
     def __init__(self, name: str, timings: Tuple[float, ...], transformations):
@@ -11,16 +19,14 @@ class Transformation:  # frame here like with an animation refers to the effects
         self.transformations = transformations
         self.timings = timings
 
-    def apply_transformation(self,frame: int, target_surface: pygame.Surface):
-        #print("aaaa")
+    def apply_transformation(self, frame: int, target_surface: pygame.Surface):
         funcs = self.transformations[frame]
-        #print(target_surface)
         result = target_surface
         for func, args, img_pos in funcs:
             args[img_pos] = result
             result = func(*args)
-        #print("nbbbbb")
         return result
+
 
 class TransformationManager:
     def __init__(self):
@@ -41,7 +47,13 @@ class TransformationManager:
             return True
         return False
 
-    def apply_transformation_to_frame(self, delta_time: int, image: pygame.Surface) -> pygame.Surface:
+    def add_transformation_from_transform_object(self,name: str, obj: Transformation):
+        if name not in self.transformations.keys():
+            self.transformations[name] = obj
+            return True
+        return False
+
+    def apply_transformation_to_frame(self, delta_time: float, image: pygame.Surface) -> pygame.Surface:
         if self.active_transformation is not None:
             self.time += delta_time
             while True:  # in case the remaining time is greater than how long that frame lasts, when changing frame, so loop until time is less than the current frames time
@@ -65,12 +77,15 @@ class TransformationManager:
         self.frame_number = 0
         self.time = 0.0
 
-    def transformation_to_animation(self, transformation_name: str, apply_to,does_loop: bool = True) -> Animation:
+    def transformation_to_animation(self, transformation_name: str, apply_to,does_loop: bool = True,
+                                    convert_mode = CONVERT_MODE.END_AT_SHORTEST) -> Animation:
         """
 
         :param transformation_name: name of the transformation to apply
         :param apply_to: either pygame.Surface or animationManager.Animation
         :param does_loop: whether the animation loops or not
+        :param convert_mode: if converting with an animation file how to handle either the anim or transform ending
+        earlier than the other
         :return: animation object of applied transformation
         """
         transformation = self.transformations[transformation_name]
@@ -79,61 +94,80 @@ class TransformationManager:
             images = [transformation.apply_transformation(frame, apply_to) for frame in range(0, len(timings)-1)]
             return Animation(transformation_name, images, timings, does_loop)
         elif type(apply_to) == Animation:
-            """Convert timings to a form which is the total elapsed since first call"""
-            elapsed_timings = [0.0]
-            anim_elapsed_time = 0.0
-            for frame_time in apply_to.timings:
-                anim_elapsed_time += frame_time
-                elapsed_timings.append(anim_elapsed_time)
+            """
+                    CONVERT FLOATS OF THE TWO LISTS TO THE Decimal TYPE
+                    THIS IS DONE TO PREVENT WEIRDNESS WHEN DOING ADDITION AND SUBTRACTION
+                    ON FLOATS AS Decimal STORES THE VALUES EXACTLY
+            """
 
-            elapsed_time = 0.0
-            for frame_time in transformation.timings:
-                elapsed_time += frame_time
+            dec_tr_timings = [Decimal(str(n)) for n in transformation.timings]
+            dec_anim_timings = [Decimal(str(n)) for n in apply_to.timings]
+
+            # ------------------BEGIN MAIN PART OF THE FUNC------------------#
+            elapsed_timings = [Decimal("0.0")]
+            """CREATE A LIST CONTAINING ALL THE ELAPSED TIMES AT EACH FRAME CHANGE
+                IN EITHER THE TRANSFORMATION OR ANIMATION"""
+            elapsed_time = Decimal("0.0")
+            for an_timing in dec_anim_timings:
+                elapsed_time += an_timing
                 elapsed_timings.append(elapsed_time)
-            elapsed_timings.sort()
-
-            frame_times = [0.0]
-            """normally this would be i-1 but since n starts on elapsed_timing[1] and i starts on 0,
-               so when n = elapsed_timings[x], i = x-1, and we want to subtract the (x-1)th value from the (x)th"""
-            elapsed_timings = [x for x in elapsed_timings if x < anim_elapsed_time]
-            # 100000 = 10^5 which you use to round down to 5 decimal places
-            elapsed_timings[-1] = floor(elapsed_timings[-1] * 100000)/100000
-            # this removes duplicate values, as dicts can't have repeated keys
+            # time of the animation in ms
+            anim_length = elapsed_time
+            elapsed_time = Decimal("0.0")
+            for tr_timing in dec_tr_timings:
+                elapsed_time += tr_timing
+                elapsed_timings.append(elapsed_time)
+            trans_length = elapsed_time
+            # remove duplicates by converting to a dictionary and back again
             elapsed_timings = list(dict.fromkeys(elapsed_timings))
-            frame_times.extend([round(n - elapsed_timings[i], 5) for i, n in enumerate(elapsed_timings[1:])])
+            elapsed_timings.sort()  # order into ascending times
 
 
-            apply_to_copy = copy(apply_to)
+            # TODO: different ways of handling either the animation or transoform being longer than the other
+            if convert_mode == CONVERT_MODE.END_AT_SHORTEST:
+                max_time = min(anim_length,trans_length)
+                elapsed_timings = [x for x in elapsed_timings if x <= max_time]
 
-            temp_transform_manager_vars = self.__dict__
-            self.set_active_transformation(transformation_name)
-            #self.time = 0.0
-            #self.frame_number = 0
+            """
+                Get the frame_time from the elapsed_timings
+               This can be calculated by:
+               frame_time[n] = elapsed_timings[n+1] - elapsed_timings[n]
+               for n is contained in N_0, n < length of elapsed_timings
+               e.g:
+               elapsed_timings = [0.0,0.2,0.3]
+               frame_timings = []
+               when n = 0:
+               frame_timings[0] = 0.2 - 0.0 = 0.2
+               when n = 1:
+               frame_timings[1] = 0.3 - 0.2 = 0.1
+            """
+            dec_frame_timings = []
+            for n in range(0, len(elapsed_timings) - 1):
+                dec_frame_timings.append(elapsed_timings[n + 1] - elapsed_timings[n])
 
-            temp_anim_mangager = AnimationManager()
+            float_frame_timings = [float(x) for x in dec_frame_timings]
+            temp_anim_manager = AnimationManager()
 
-            temp_anim_mangager.add_animation_from_Animation_object("t", apply_to_copy)
-            temp_anim_mangager.set_active_animation("t")
+            temp_apply_to = deepcopy(apply_to)
 
-            n = 0
-            for x in frame_times:
-                print(temp_anim_mangager.active_animation)
-                print(elapsed_timings[n])
-                n+=1
-                self.apply_transformation_to_frame(x, temp_anim_mangager.get_frame(x))
-            self.__dict__ = temp_transform_manager_vars
-            #return Animation(transformation_name, frame_images, frame_times, does_loop)
+            temp_anim_manager.add_animation_from_Animation_object("i",temp_apply_to)
+            temp_anim_manager.set_idle_animation("i")
+            temp_trans_manager = TransformationManager()
 
+            temp_transform = deepcopy(self.active_transformation)
+
+            temp_trans_manager.add_transformation_from_transform_object("i",temp_transform)
+            temp_trans_manager.set_active_transformation("i")
+            images = tuple([temp_trans_manager.apply_transformation_to_frame(n,temp_anim_manager.get_frame(n)) for n in float_frame_timings])
+
+            return Animation(transformation_name,images,tuple(float_frame_timings),does_loop)
 
 
 class CustomTransitions:
-    """TODO: maybe see if way which uses less performance, presumably creating a new copy of the surface is causing
-             impact """
     @staticmethod
     def tint_image(image: pygame.Surface,colour: tuple[int, int, int]) -> pygame.Surface:
         image_copy = image.copy().convert_alpha()
         image_copy.fill(colour, special_flags=pygame.BLEND_ADD)
         return image_copy
-
 
 
